@@ -1,12 +1,12 @@
 from flask import Flask
 from telegram import Update, Bot, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config import TOKEN, OWNER_ID
 import threading
 
 app = Flask(__name__)
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: CallbackContext):
     user = update.effective_user
     mention = f"{user.first_name}"
     keyboard = [
@@ -22,12 +22,12 @@ def start(update: Update, context: CallbackContext):
         ]
     ]
 
-    context.bot.send_photo(chat_id=update.effective_chat.id, 
-                            photo="https://te.legra.ph/file/5a9550c10d934ff11f7b8.jpg")
-    update.message.reply_text(f"Hello! {mention}! I am Edit Guardian bot I delete Edited messages", 
-                              reply_markup=InlineKeyboardMarkup(keyboard))
+    await context.bot.send_photo(chat_id=update.effective_chat.id, 
+                                 photo="https://te.legra.ph/file/5a9550c10d934ff11f7b8.jpg")
+    await update.message.reply_text(f"Hello! {mention}! I am Edit Guardian bot I delete Edited messages", 
+                                    reply_markup=InlineKeyboardMarkup(keyboard))
 
-def check_edit(update: Update, context: CallbackContext):
+async def check_edit(update: Update, context: CallbackContext):
     bot: Bot = context.bot
     edited_message = update.edited_message
     if not edited_message:
@@ -41,18 +41,16 @@ def check_edit(update: Update, context: CallbackContext):
     if user_id == OWNER_ID:
         return  # Ignore if owner edits the message
     
-    bot.send_message(chat_id=chat_id, text=f"{user_mention} just edited a message🤡. I deleted their edited message🙂‍↕️🤡.")
-    bot.delete_message(chat_id=chat_id, message_id=message_id)
+    await bot.send_message(chat_id=chat_id, text=f"{user_mention} just edited a message🤡. I deleted their edited message🙂‍↕️🤡.")
+    await bot.delete_message(chat_id=chat_id, message_id=message_id)
 
 def run_bot():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+    application = Application.builder().token(TOKEN).build()
     
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.update.edited_message, check_edit))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Update.EDITED_MESSAGE, check_edit))
     
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 @app.route('/')
 def home():
