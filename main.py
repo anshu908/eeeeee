@@ -6,7 +6,7 @@ import threading
 
 app = Flask(__name__)
 
-async def start(update: Update, context: CallbackContext):
+async def start(update: Update, context):
     user = update.effective_user
     mention = f"{user.first_name}"
     keyboard = [
@@ -23,11 +23,12 @@ async def start(update: Update, context: CallbackContext):
     ]
 
     await context.bot.send_photo(chat_id=update.effective_chat.id, 
-                                 photo="https://te.legra.ph/file/5a9550c10d934ff11f7b8.jpg")
+                            photo="https://te.legra.ph/file/5a9550c10d934ff11f7b8.jpg")
+    
     await update.message.reply_text(f"Hello! {mention}! I am Edit Guardian bot I delete Edited messages", 
-                                    reply_markup=InlineKeyboardMarkup(keyboard))
+                              reply_markup=InlineKeyboardMarkup(keyboard))
 
-async def check_edit(update: Update, context: CallbackContext):
+async def check_edit(update: Update, context):
     bot: Bot = context.bot
     edited_message = update.edited_message
     if not edited_message:
@@ -46,10 +47,10 @@ async def check_edit(update: Update, context: CallbackContext):
 
 def run_bot():
     application = Application.builder().token(TOKEN).build()
-    
+
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.Update.EDITED_MESSAGE, check_edit))
-    
+    application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, check_edit))
+
     application.run_polling()
 
 @app.route('/')
