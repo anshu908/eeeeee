@@ -1,8 +1,8 @@
 from flask import Flask
 from telegram import Update, Bot, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
+import asyncio
 from config import TOKEN, OWNER_ID
-import threading
 
 app = Flask(__name__)
 
@@ -45,19 +45,19 @@ async def check_edit(update: Update, context):
     await bot.send_message(chat_id=chat_id, text=f"{user_mention} just edited a message🤡. I deleted their edited message🙂‍↕️🤡.")
     await bot.delete_message(chat_id=chat_id, message_id=message_id)
 
-def run_bot():
+async def run_bot():
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, check_edit))
 
-    application.run_polling()
+    await application.run_polling()
 
 @app.route('/')
 def home():
     return "Bot is running!"
 
 if __name__ == '__main__':
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_bot())  # Telegram bot ko async run karne ke liye
     app.run(host='0.0.0.0', port=8080)
