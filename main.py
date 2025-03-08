@@ -4,13 +4,15 @@ from flask import Flask, request
 from pymongo import MongoClient
 import os
 import threading
+import asyncio
 
 TOKEN = "8077840807:AAE9COv3o-3ffgLXr-XzZhskHG4PEhkDXQI"
-IMAGE_URL = "https://envs.sh/wf4.jpg"
-OWNER_LINK = "https://t.me/your_owner"
-SUPPORT_LINK = "https://t.me/your_support"
-GROUP_LINK = "https://t.me/your_group"
-MONGO_URI = "mongodb+srv://your_mongo_uri"
+IMAGE_URL = "https://envs.sh/Ed4.jpg"
+OWNER_LINK = "https://t.me/rishu1286"
+SUPPORT_LINK = "https://t.me/vip_robotz"
+GROUP_LINK = "https://t.me/rishusupport"
+MONGO_URI = "mongodb+srv://Krishna:pss968048@cluster0.4rfuzro.mongodb.net/?retryWrites=true&w=majority"
+ADMIN_CHAT_ID = 6258915779  # Admin Telegram ID
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -27,11 +29,15 @@ async def start(update: Update, context):
     user_id = update.message.from_user.id
     chat_id = update.message.chat_id
     first_name = update.message.from_user.first_name
+    username = update.message.from_user.username or "No Username"
     
     # Check if user already exists
     if not users_collection.find_one({"user_id": user_id}):
-        users_collection.insert_one({"user_id": user_id, "chat_id": chat_id, "first_name": first_name})
+        users_collection.insert_one({"user_id": user_id, "chat_id": chat_id, "first_name": first_name, "username": username})
         await context.bot.send_message(chat_id, "✅ A new user has joined!")
+        
+        # Notify admin asynchronously
+        asyncio.create_task(context.bot.send_message(ADMIN_CHAT_ID, f"🚀 New user joined: {first_name} (@{username}) (ID: {user_id})"))
     
     keyboard = [
         [InlineKeyboardButton("Owner", url=OWNER_LINK), InlineKeyboardButton("Support", url=SUPPORT_LINK)],
@@ -48,29 +54,44 @@ async def message_edit(update: Update, context):
         text = f"⚠️ {user.mention_html()} ne ek message edit kiya!"
         await context.bot.send_message(chat_id, text, parse_mode="HTML")
 
-async def broadcast_message(context, message):
+async def broadcast(update: Update, context):
+    if update.message.chat_id != ADMIN_CHAT_ID:
+        await update.message.reply_text("❌ You are not authorized to send a broadcast.")
+        return
+    
     users = users_collection.find()
+    broadcast_message = update.message.text.replace("/broadcast", "").strip()
+    if not broadcast_message:
+        await update.message.reply_text("❌ Please provide a message to broadcast.")
+        return
+    
+    sent_count = 0
+    failed_count = 0
+    
     for user in users:
-        try:
-            await context.bot.send_message(user["chat_id"], message)
-        except Exception as e:
-            print(f"Failed to send message to {user['chat_id']}: {e}")
+        chat_id = user.get("chat_id")
+        if chat_id:
+            try:
+                await context.bot.send_message(chat_id=chat_id, text=broadcast_message)
+                sent_count += 1
+            except Exception as e:
+                print(f"Failed to send message to {chat_id}: {e}")
+                failed_count += 1
+    
+    await update.message.reply_text(f"✅ Broadcast sent successfully!\n📤 Sent: {sent_count}\n❌ Failed: {failed_count}")
 
-@app.route("/broadcast", methods=["POST"])
-def broadcast():
-    data = request.json
-    message = data.get("message")
-    if message:
-        threading.Thread(target=lambda: telegram_app.create_task(broadcast_message(telegram_app, message))).start()
-        return {"status": "Broadcast started"}, 200
-    return {"error": "Message is required"}, 400
+def run_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(telegram_app.run_polling())
 
 if __name__ == "__main__":
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(MessageHandler(filters.ALL & filters.UpdateType.EDITED_MESSAGE, message_edit))
+    telegram_app.add_handler(CommandHandler("broadcast", broadcast))
     
     # Start Telegram bot in a separate thread
-    threading.Thread(target=telegram_app.run_polling, daemon=True).start()
+    threading.Thread(target=run_bot, daemon=True).start()
     
     # Run Flask app
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
